@@ -30,7 +30,6 @@ more promising for this document" before committing to a real implementation.
 pip install -r requirements.txt
 ```
 
-(Use the same virtual environment you've been using for the rest of this learning project, or create a new one.)
 
 ## Run
 
