@@ -16,6 +16,11 @@ toggle** sits in the top bar.
 This won't give you a perfectly accurate answer — it's a rough, local, no-cloud way to get
 a first read on "is my chunk size reasonable" and "which embedding model / algorithm looks
 more promising for this document" before committing to a real implementation.
+<img width="1875" height="851" alt="image" src="https://github.com/user-attachments/assets/1a55962a-81ad-484c-8e94-aa2437d966dc" />
+<img width="1057" height="637" alt="image" src="https://github.com/user-attachments/assets/53009233-914a-449e-9733-43b4645d95a7" />
+<img width="1048" height="666" alt="image" src="https://github.com/user-attachments/assets/193e2376-6cd3-4e95-bc61-e779fdc1a465" />
+<img width="836" height="763" alt="image" src="https://github.com/user-attachments/assets/591df762-6f22-4907-80ea-82e8aaa3afd1" />
+<img width="1878" height="822" alt="image" src="https://github.com/user-attachments/assets/d9184ea3-a49c-4c32-afab-828ec697716c" />
 
 ## Prerequisites
 
