@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learn — RAG Evaluator</title>
+  <link rel="stylesheet" href="/static/style.css?v=5" />
+  <script>
+    // apply the theme saved on the main page before first paint
+    (function () {
+      var t = localStorage.getItem("theme");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="brand-logo">📚</span> Learn RAG</div>
+    <div class="topbar-actions">
+      <a href="/" class="ghost-btn">← Back to Evaluator</a>
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <header class="hero">
+      <h1>How it all works</h1>
+      <p>Every concept this tool uses, explained from scratch — including where each retrieval
+        strategy tends to break. Read top to bottom, or jump to what you're curious about.</p>
+    </header>
+
+    <section class="card">
+      <h2 class="learn-h2">The basics</h2>
+      <div class="learn-faq">
+        <details open>
+          <summary>What is a token?</summary>
+          <div class="faq-a">Models don't read letters or words — they read <strong>tokens</strong>, chunks of text a tokenizer carved out by frequency. Common words are a single token; rarer words split into pieces (<code>unbelievable</code> → <code>un</code> + <code>believ</code> + <code>able</code>). Even a leading space changes the token. Token counts — not word counts — are what drive model cost and context limits.</div>
+        </details>
+        <details>
+          <summary>What is an embedding model?</summary>
+          <div class="faq-a">It turns a piece of text into a fixed-length list of numbers (a <strong>vector</strong>) that captures its meaning. Two texts with similar meaning land close together in that space, even if they share no words. The vector length is fixed per model (e.g. 768) no matter how long the input is — open the 🦙 Ollama panel on the main page and inspect a model's <code>embedding_length</code> to see it.</div>
+        </details>
+        <details>
+          <summary>What is a vector database / similarity search?</summary>
+          <div class="faq-a">Once every chunk of your document is a vector, "finding relevant text" becomes "finding the nearest vectors to the question's vector." Closeness is measured with <strong>cosine similarity</strong> (1.0 = same direction/meaning, 0 = unrelated). This tool computes that directly in Python; a production system would use a dedicated vector database with a fast approximate-nearest-neighbor index.</div>
+        </details>
+        <details>
+          <summary>Chunking &amp; overlap — why?</summary>
+          <div class="faq-a">Embedding models have a maximum input size, and huge chunks blur meaning while tiny ones lose context. So we split text into chunks. <strong>Overlap</strong> shares a little text between neighboring chunks so a sentence sitting on a boundary isn't cut in half.
+            <div class="callout">Gotcha: too much overlap makes neighboring chunks near-duplicates, which can confuse diversity-aware strategies like MMR — a real interaction between two settings that each seem reasonable alone.</div>
+          </div>
+        </details>
+        <details>
+          <summary>What is RAG?</summary>
+          <div class="faq-a"><strong>Retrieval-Augmented Generation.</strong> Instead of relying only on what a model memorized in training, you retrieve relevant chunks of <em>your</em> documents at question time and hand them to the model as context before it answers. That lets it answer about private notes, a codebase, or documents that didn't exist when it was trained — and, done well, refuse to guess when the answer isn't there.</div>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="learn-h2">The retrieval strategies</h2>
+      <div class="learn-faq">
+        <details>
+          <summary>Top-K</summary>
+          <div class="faq-a">The baseline: embed the question, return the <code>k</code> chunks whose vectors are closest. Simple and usually strong. Every other strategy is measured against it.</div>
+        </details>
+        <details>
+          <summary>MMR (diversity-aware)</summary>
+          <div class="faq-a">Like Top-K, but after the first pick it penalizes chunks too similar to ones already chosen — trading some relevance for variety.
+            <div class="callout">It can backfire: if two adjacent chunks are both correct but look alike, MMR may drop one and hurt accuracy. That's exactly why this tool <em>measures</em> hit rate instead of assuming MMR is an improvement.</div>
+          </div>
+        </details>
+        <details>
+          <summary>Hybrid (meaning + keywords)</summary>
+          <div class="faq-a">Combines vector search with classic keyword search (<strong>BM25</strong>) and fuses the two rankings with Reciprocal Rank Fusion. Vectors are great at meaning but can miss an exact term — a product code, a name — that keyword search nails instantly. Hybrid catches both.</div>
+        </details>
+        <details>
+          <summary>HyDE</summary>
+          <div class="faq-a">Asks a chat model to first write a <em>hypothetical</em> answer to your question, then searches using that answer's embedding instead of the question's. Answer-shaped text often matches document-shaped text better than a question does. Costs one extra LLM call per question.</div>
+        </details>
+        <details>
+          <summary>Contextual Retrieval</summary>
+          <div class="faq-a">Before embedding, a chat model writes a 1–2 sentence blurb saying what each chunk is about, and prepends it. So a lonely chunk like <em>“it dropped 15% that quarter”</em> gets embedded together with <em>“this is about ACME's Q3 2023 revenue.”</em> A big retrieval boost — but one LLM call per chunk makes indexing slow.</div>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="learn-h2">Reading the results</h2>
+      <div class="learn-faq">
+        <details>
+          <summary>What do the metrics mean?</summary>
+          <div class="faq-a"><strong>Relevance</strong>: how close the retrieved chunks are to the question (higher is better). <strong>Redundancy</strong>: how similar the retrieved chunks are to <em>each other</em> (lower = more varied coverage). <strong>Hit Rate</strong>: for questions with an expected keyword, how often that keyword actually showed up in the retrieved chunks — the only true accuracy metric here. <strong>Latency</strong>: retrieval time.</div>
+        </details>
+        <details>
+          <summary>High relevance but low hit rate — what does that mean?</summary>
+          <div class="faq-a">It means the strategy confidently retrieved chunks that <em>look</em> related to the question but don't actually contain the answer. This is the single most useful thing to catch before building a real pipeline, and why a keyword-based hit rate is worth the effort of supplying ground truth.</div>
+        </details>
+        <details>
+          <summary>Hit rate is 0% but the generated answer was correct — is it broken?</summary>
+          <div class="faq-a">No — those measure two different steps. <strong>Hit rate</strong> checks the <em>retrieval</em> step: did a chunk containing your literal keyword get pulled? The <strong>grounded answer</strong> checks the <em>generation</em> step: did the model answer well from whatever was retrieved. If retrieval pulled the right chunk but your keyword wasn't a literal text match, you get a MISS <em>and</em> a correct answer at the same time — the keyword check is a crude proxy, not the source of truth.
+            <div class="callout">Keywords are split on commas, so <code>Django, FastAPI</code> counts as two acceptable keywords and matches text like "Django and FastAPI". Expand a result row to see exactly which keywords were searched and which matched.</div>
+          </div>
+        </details>
+        <details>
+          <summary>Why does the first run feel slow?</summary>
+          <div class="faq-a">Ollama loads a model into memory the first time you use it, which can take several seconds. After that it stays warm and later calls are much faster. Contextual Retrieval and HyDE are slower by nature too, because they make extra chat-model calls.</div>
+        </details>
+        <details>
+          <summary>How accurate is this tool, really?</summary>
+          <div class="faq-a">It's a rough, local first read — not a benchmark. Chunk token counts use an approximate tokenizer, everything is held in memory, and search is brute-force. The goal is to build intuition and catch obvious problems (bad chunk size, a weak embedding model, a strategy that hurts) <em>before</em> you invest in a full pipeline.</div>
+        </details>
+      </div>
+    </section>
+
+    <footer><a href="/">← Back to the Evaluator</a></footer>
+  </div>
+</body>
+</html>

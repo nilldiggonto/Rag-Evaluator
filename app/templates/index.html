@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG Evaluator</title>
+  <link rel="stylesheet" href="/static/style.css?v=5" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="brand-logo">🔍</span> RAG Evaluator</div>
+    <div class="topbar-actions">
+      <a href="/learn" class="ghost-btn">📚 Learn</a>
+      <button type="button" id="theme-toggle" class="ghost-btn" title="Toggle theme">🌙</button>
+      <button type="button" id="ollama-toggle" class="ghost-btn">🦙 Ollama</button>
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <header class="hero">
+      <h1>See which RAG setup actually works</h1>
+      <p>Upload or paste a document, ask a few questions, and compare embedding models and
+        retrieval strategies side by side — running entirely on your machine through Ollama.
+        Built to <em>teach</em>, so it shows you what happens at every step.</p>
+    </header>
+
+    <div id="ollama-banner" class="banner warning hidden"></div>
+
+    <!-- STEP 1 -->
+    <section class="card" id="section-upload">
+      <div class="card-head"><span class="step-badge">1</span><h2>Add a document</h2></div>
+      <p class="card-sub">Upload a file or paste text. Then choose how it's split into chunks and which embedding models to try.</p>
+
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="file">📄 Upload file</button>
+        <button type="button" class="tab" data-tab="paste">✍️ Paste text</button>
+      </div>
+
+      <div class="tab-panel" id="tab-file">
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-icon">📄</div>
+          <div class="dropzone-text"><strong>Drop a .txt or .pdf here</strong><span>or click to browse</span></div>
+          <input type="file" id="file-input" accept=".txt,.pdf" hidden />
+        </div>
+        <div id="file-chosen" class="file-chosen hidden"></div>
+      </div>
+
+      <div class="tab-panel hidden" id="tab-paste">
+        <label class="grow">Paste your text
+          <textarea id="text-input" rows="8" placeholder="Paste any text here — notes, an article, documentation…"></textarea>
+        </label>
+      </div>
+
+      <div class="field-row">
+        <label class="grow">Chunk size (tokens)
+          <input type="number" id="chunk-size" value="300" min="20" required />
+          <span class="hint">Text per piece before embedding.</span>
+        </label>
+        <label class="grow">Overlap (tokens)
+          <input type="number" id="overlap" value="50" min="0" required />
+          <span class="hint">Shared text between neighbors, so boundary sentences aren't lost.</span>
+        </label>
+      </div>
+
+      <div class="subfield">
+        <div class="subfield-label">Embedding models to test <span class="hint">pick up to 3 — click one to see if your chunk size fits it</span></div>
+        <div id="embedding-model-chips" class="chip-toggle-row">Checking Ollama…</div>
+        <div id="compat-notes" class="compat-notes"></div>
+      </div>
+
+      <label class="switch-row">
+        <input type="checkbox" id="contextual-toggle" />
+        <span class="switch"></span>
+        <span class="switch-body">
+          <strong>Contextual Retrieval <span class="tag-slow">slow</span></strong>
+          <span>Ask a chat model to add a 1–2 sentence context to every chunk before embedding, so a chunk like “it dropped 15%” carries what it's about. One LLM call per chunk.</span>
+        </span>
+      </label>
+      <label class="grow indented hidden" id="context-model-wrap">Context-generation model
+        <select id="context-model"></select>
+      </label>
+
+      <button type="button" id="process-btn">Process Document</button>
+      <div id="upload-loading" class="loading-box hidden"></div>
+      <div id="upload-status" class="status-line"></div>
+      <button type="button" id="upload-details-btn" class="details-btn hidden">ⓘ How did this work?</button>
+      <div id="upload-details" class="details-box hidden"></div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="card disabled" id="section-evaluate">
+      <div class="card-head"><span class="step-badge">2</span><h2>Ask questions &amp; compare strategies</h2></div>
+      <p class="card-sub">Add questions. If you know a word that should appear in the answer, add it as an "expected keyword" to get a real accuracy score, not just a vibe.</p>
+
+      <div id="question-rows"></div>
+      <button type="button" id="add-question" class="secondary">+ Add question</button>
+
+      <div class="subfield">
+        <div class="subfield-label">Retrieval strategies to compare</div>
+        <div class="algo-grid">
+          <label class="algo-card">
+            <input type="checkbox" class="algorithm-checkbox" value="topk" checked />
+            <span class="algo-body"><strong>Top-K</strong><span>Closest chunks by meaning. The baseline.</span></span>
+          </label>
+          <label class="algo-card">
+            <input type="checkbox" class="algorithm-checkbox" value="mmr" />
+            <span class="algo-body"><strong>MMR</strong><span>Avoids near-duplicate chunks. Can help or hurt.</span></span>
+          </label>
+          <label class="algo-card">
+            <input type="checkbox" class="algorithm-checkbox" value="hybrid" />
+            <span class="algo-body"><strong>Hybrid</strong><span>Meaning + keyword search, fused together.</span></span>
+          </label>
+          <label class="algo-card">
+            <input type="checkbox" class="algorithm-checkbox" value="hyde" />
+            <span class="algo-body"><strong>HyDE</strong><span>Search with a drafted hypothetical answer. Needs a chat model.</span></span>
+          </label>
+        </div>
+      </div>
+
+      <label class="grow" id="hyde-model-wrap">Generation model <span class="hint">(only used by HyDE)</span>
+        <select id="hyde-model"></select>
+      </label>
+
+      <details class="advanced">
+        <summary>Advanced settings</summary>
+        <div class="field-row">
+          <label>k (results returned)
+            <input type="number" id="param-k" value="3" min="1" />
+          </label>
+          <label>fetch_k (candidate pool: MMR / Hybrid)
+            <input type="number" id="param-fetch-k" value="8" min="1" />
+          </label>
+          <label>lambda (MMR relevance vs diversity)
+            <input type="number" id="param-lambda" value="0.5" min="0" max="1" step="0.1" />
+          </label>
+        </div>
+      </details>
+
+      <button type="button" id="run-evaluation" disabled>Run Evaluation</button>
+      <div id="evaluate-loading" class="loading-box hidden"></div>
+      <div id="evaluate-status" class="status-line"></div>
+      <div id="results-table-wrap"></div>
+      <button type="button" id="evaluate-details-btn" class="details-btn hidden">ⓘ How did this work?</button>
+      <div id="evaluate-details" class="details-box hidden"></div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="card disabled" id="section-generate">
+      <div class="card-head"><span class="step-badge">3</span><h2>Generate a grounded answer</h2></div>
+      <p class="card-sub">Pick one result and see the actual answer a chat model writes using only the retrieved chunks.</p>
+
+      <div class="field-row">
+        <label class="grow">Result combination
+          <select id="generate-combo"></select>
+        </label>
+        <label class="grow">Question
+          <select id="generate-question"></select>
+        </label>
+        <label class="grow">Generation model
+          <select id="generate-model"></select>
+        </label>
+      </div>
+      <button type="button" id="run-generate" disabled>Generate</button>
+      <div id="generate-loading" class="loading-box hidden"></div>
+      <div id="generate-status" class="status-line"></div>
+      <div id="generate-result"></div>
+      <button type="button" id="generate-details-btn" class="details-btn hidden">ⓘ How did this work?</button>
+      <div id="generate-details" class="details-box hidden"></div>
+    </section>
+
+    <p class="learn-cta">New to this? <a href="/learn">Read “How it all works”</a> — every concept explained for beginners.</p>
+
+    <footer>Everything runs locally against your Ollama install. Nothing leaves your machine.</footer>
+  </div>
+
+  <!-- OLLAMA SIDE PANEL -->
+  <div id="panel-overlay" class="panel-overlay hidden"></div>
+  <aside id="ollama-panel" class="side-panel">
+    <div class="panel-head">
+      <h3>🦙 Your Ollama</h3>
+      <button type="button" id="panel-close" class="ghost-btn">✕</button>
+    </div>
+    <div id="panel-status" class="panel-status"></div>
+    <div class="panel-section">
+      <label class="panel-select-label">Inspect a model
+        <select id="panel-model-select"><option value="">— choose a model —</option></select>
+      </label>
+      <p class="hint" style="margin-top:0.5rem">Metadata is loaded only when you pick a model, so having many models installed stays fast.</p>
+    </div>
+    <div class="panel-section">
+      <div id="panel-model-detail" class="panel-detail">Pick a model above to load and explain its metadata.</div>
+    </div>
+  </aside>
+
+  <script src="/static/script.js?v=5"></script>
+</body>
+</html>
